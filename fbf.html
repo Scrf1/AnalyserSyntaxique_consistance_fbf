@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Formules bien formées</title>
+    <style>
+        input
+        {
+            width: 300px;
+            height: 30px;
+        }
+        button
+        {
+            height: 30px;
+        }
+        
+    </style>
+</head>
+<body>
+    <div>
+        <h1>Les caractères à utiliser</h1>
+        <ol>
+            <li><span>= : pour l'équivalence</span></li>
+            <li><span>&gt; : pour l'implication</span></li>
+            <li><span>&amp; : pour le "et"</span></li>
+            <li><span>| : Pour le "ou"</span></li>
+        </ol>
+        <p>NB:</p>
+        <ul>
+            <li> Pour le test de satisfiabilité, la formule entrée doit être sous forme normale conjonctive</li>
+            <li>Le bouton vérifier FBF est utilisé pour savoir si la formule est bien formée ou non</li>
+        </ul>
+        
+        <div>
+            <div id="in">
+                    <input type="text" id="formule"/>
+                    <button onclick="proceder()">Vérifier FBF</button> 
+                    <button id="sat">Vérifier satisfiabilité</button>
+            </div>
+        </div>
+        
+            
+    </div>
+    <script >
+            //Les structures de données
+
+        var predictive = {
+            1: {"(":"s4", ")":"", "!":"s3", "#":"", "p":"s5", "$":"", "F":"2"},
+            2: {"(":"", ")":"", "!":"", "#":"s6", "p":"", "$":"acc", "F":""},
+            3: {"(":"s4", ")":"", "!":"s3", "#":"", "p":"s5", "$":"", "F":"7"},
+            4: {"(":"s4", ")":"", "!":"s3", "#":"", "p":"s5", "$":"", "F":"8"},
+            5: {"(":"r4", ")":"r4", "!":"r4", "#":"r4", "p":"r4", "$":"r4", "F":"r4"},
+            6: {"(":"s4", ")":"", "!":"s3", "#":"", "p":"s5", "$":"", "F":"10"},
+            7: {"(":"r1", ")":"r1", "!":"r1", "#":"s6", "p":"r1", "$":"r1", "F":"r1"},
+            8: {"(":"", ")":"s9", "!":"", "#":"s6", "p":"", "$":"", "F":""},
+            9: {"(":"r2", ")":"r2", "!":"r2", "#":"r2", "p":"r2", "$":"r2", "F":"r2"},
+            10: {"(":"r3", ")":"r3", "!":"r3", "#":"s6", "p":"r3", "$":"r3", "F":"r3"}
+        };
+
+        var reduce = {
+            0 :"F$",
+            1 : "!F",
+            2 : "(F)",
+            3 : "F#F",
+            4 : "p"
+        };
+
+        function proceder()
+        {
+            var input = document.getElementById("formule").value;
+            input = remplacer(input);
+            var action = "";
+
+            var stack = [1];
+            // La variable error est utilisé pour savoir si on est tombé sur une case vide de notre table prédictive
+            var error = false;
+            //La variable accept est utilisé pour savoir si tombe sur l'indicateur acc de la table prédictive
+            var accept = false;
+
+            var current_state; // current_state contient l'état courant qui est au dessus de la pile stack
+            var current_sym;// current_sym contient le symbole le plus en haut de la pile
+            var action; // action correspond à l'action correspondant dans la table prédictive à l'indice current_state current_sym
+            var tmp; // variable temporaire qui sera utilisé lors d'un reduce pour conserver un etat
+            //La variable pointer est utilisé pour pointer sur le premier élément du input  
+            var pointer = 0;
+
+
+            while(!error && !accept)
+            {
+                current_state = stack[stack.length-1];
+                current_sym = input.charAt(pointer);
+                //document.write("Current symbol :   "+current_sym + "   current_state :  "+current_state);
+                action = predictive[current_state][current_sym];
+                //document.write(action);
+                //Si l'action est un shift, alors on met le symbole courant en tete de pile ainsi que l'état courant
+                if(typeof(action)!="undefined" && action!="" && action[0] == "s")
+                {
+                    stack.push(current_sym);
+                    stack.push(parseInt(action.slice(1,)));
+                    pointer++; 
+                }
+                //Sinon si c'est un reduce, on dépile le double du nombre fois de la longueur de la règle de production correspondante
+                else if(typeof(action)!="undefined" && action!="" && action[0] == "r")
+                {
+                    for(var i = 0; i < 2*reduce[parseInt(action.slice(1,))].length; i++)
+                    {
+                        stack.pop();
+                    }
+                    tmp = stack[stack.length-1];
+                    stack.push("F");
+                    tmp = parseInt(predictive[tmp]["F"]);
+                    stack.push(tmp);
+                }
+                
+                else if(typeof(action)!="undefined" && action!="" && action[0] == "a") // si c'est acc, alors on sort de la boucle avec succes en sortant de la boucle
+                {
+                    accept = true;
+                }
+                else // Dans tous les autres cas, il y'a une erreur
+                {
+                    error = true;
+                }
+            // document.write("action = "+action+"          " + stack +"<br>");
+            }
+
+            if(accept)
+                alert("Formule bien formée");
+            else
+                alert("Formule mal formée");    
+        }
+
+
+        //Fonction auxiliaire
+        function remplacer(mot)
+        {
+            var regex = /[a-zA-Z0-9_âäàéèùêëîïôöçñ]/g;
+            var word ="";
+            mot = mot.split(" ").join("");
+            mot = mot.replace(regex, 'p');
+            mot = mot.replace(/p+/g, 'p');
+            mot = mot.replace(/&|\||>|=/g,'#');
+            mot += "$";
+            return mot;
+        }
+        //proceder();
+
+//====================================================================================================================================
+//      TP2: Satisfiabilité des formules bien formées en forme normale conjonctive
+//=====================================================================================================================================
+    
+
+    //**********************************************************************************************************************************        
+//              LES STRUCTURES DE DONNEES
+//**********************************************************************************************************************************
+        var input1 ;
+        var ens_clauses = [];
+        var ens_litteraux = [];
+        var btn = document.getElementById("sat");
+        btn.addEventListener('click', testSatisfiabilite);
+//*********************************************************************************************************************************
+//              LES DIFFERENTES FONCTIONS AUXILIAIRES
+//*************************************************************************************************************************************
+        function construire_clauses(input1)
+        {
+            var input_clauses_caracteres;
+            var clauses = [];
+            input1 = input1.split(" ").join(""); 
+            input1 = input1.split("(").join(""); 
+            input1 = input1.split(")").join("");
+            input_clauses_caracteres = input1.split("&");
+            for(var clause in input_clauses_caracteres)
+            {
+                clauses.push(input_clauses_caracteres[clause].split("|"));
+            }
+            return clauses;
+        }
+        
+        function priver(litteral, clause)
+        {
+             //Retirer un littéral d'une clause et retourne la nouvelle clause
+             var c = [];
+            if(clause.length == 1 && litteral == clause[0])
+                return [];
+            else if(clause.length == 0)
+                return clause;
+            else if(clause.length > 1 && appartient(litteral, clause))
+            {   
+                for(var i=0; i<clause.length; i++)
+                {
+                    if(litteral != clause[i])
+                        c.push(clause[i]);
+                }
+                return c;
+            }
+            else
+                return clause;
+        }
+
+        function appartient(litteral, clause)
+        {
+            //Cette fonction est utilisée pour savoir si un litteral apparient à un clause
+            // clause est un tableau de strings
+            var appartient = false;
+            for(i in clause)
+            {
+                if(litteral == clause[i])
+                {
+                    appartient = true;
+                    break;
+                }
+            }
+            return appartient;
+        }
+
+        function non(litteral)
+        {
+            if(litteral[0] == "!")
+                return litteral.slice(1,);
+            else
+                return "!" + litteral;    
+        }
+
+        function priver(litteral, clause)
+        {
+             //Retirer un littéral d'une clause et retourne la nouvelle clause
+             var c = [];
+            if(clause.length == 1 && litteral == clause[0])
+                return [];
+            else if(clause.length == 0)
+                return clause;
+            else if(clause.length > 1 && appartient(litteral, clause))
+            {   
+                for(var i=0; i<clause.length; i++)
+                {
+                    if(litteral != clause[i])
+                        c.push(clause[i]);
+                }
+                return c;
+            }
+            else
+                return clause;
+        }
+
+        function existeClauseVide(clauses)
+        {
+            var trouver = false;
+            if(clauses.length == 0)
+                return false;
+            else
+            {
+                for(var i=0;i<clauses.length; i++)
+                if(clauses[i].length == 0)
+                    {
+                        trouver = true;
+                        break;
+                    }
+                 return trouver;     
+            }    
+               
+        }
+
+        function sP(litteral, clauses)
+        {
+            var s_p = [];
+            if(clauses.length > 0 )
+            {
+                for(var i=0; i<clauses.length; i++)
+                {
+                    if(appartient(litteral,clauses[i]))
+                    {
+                        s_p.push(clauses[i]);
+                    } 
+                }
+            }
+            return s_p;
+        }
+        function sNonP(litteral, clauses)
+        {
+            return sP(non(litteral), clauses);
+        }
+
+        function sPrimeP(litteral, clauses)
+        {
+            var s_prime_p = [];
+            if(clauses.length > 0)
+            {
+                for(var i=0; i<clauses.length; i++)
+                {
+                    s_prime_p.push(priver(litteral, clauses[i]));
+                }
+            }
+            return s_prime_p;
+        }
+        function sPrimeNonP(litteral, clauses)
+        {
+            var s_prime_non_p = [];
+            if(clauses.length > 0)
+            {
+                for(var i=0; i<clauses.length; i++)
+                {
+                    s_prime_non_p.push(priver(non(litteral), clauses[i])); 
+                }
+            }
+            return s_prime_non_p;
+        }
+        function sSecond(litteral, clauses)
+        {
+            var s_second = [];
+            if(clauses.length > 0)
+            {
+                for(var i =0 ; i<clauses.length ; i++)
+                {
+                    if(!appartient(litteral, clauses[i]) && !appartient(non(litteral), clauses[i]))
+                        s_second.push(clauses[i]);
+                 }
+            }
+            return s_second;
+        } 
+        
+        function litteraux_ens(clauses)
+        {
+            // Permet d'extraire tous les littéraux présents dans une clause
+            var litteraux = [];
+            var lit;
+            if(clauses.length >0)
+            {
+                for(var i=0; i<clauses.length ; i++)
+                {
+                    if(clauses[i].length > 0)
+                    {
+                        for(j=0; j<clauses[i].length; j++)
+                        {
+                            lit = /[a-zA-Z]+/.exec(clauses[i][j]).join("");
+                            if(litteraux.indexOf(lit) == -1)
+                            {
+                                litteraux.push(lit);
+                            } 
+                        }
+                    }
+                }
+            
+            }
+            return litteraux;
+        }
+
+//**************************************************************************************************************************************************
+//              FONCTION PRINCIPALE
+//***************************************************************************************************************************************************
+            function satisfiable(clauses)
+            {
+                var s_p = [];
+                var s_non_p = [];
+                var s_prime_p = [];
+                var s_prime_non_p = [];
+                var s_second = [];
+                var lit;
+                var litteraux = litteraux_ens(clauses);  console.log("Les litteraux   =   ",litteraux);
+
+                if(clauses.length == 0)
+                    return true;
+                else if(existeClauseVide(clauses) || litteraux.length == 0)
+                    return false;
+                else
+                {
+                    lit = litteraux[0]; console.log("Lit  =  ",lit);
+                    s_p = sP(lit, clauses); console.log("Sp  =  ",s_p)
+                    s_non_p = sNonP(lit, clauses); console.log("SnonP   =  ", s_non_p);
+                    s_prime_p = sPrimeP(lit, s_p); console.log("SprimeP  =  ", s_prime_p)
+                    s_prime_non_p = sPrimeNonP(lit, s_non_p); console.log("SPrimeNonP  =  ",s_prime_non_p );
+                    s_second = sSecond(lit, clauses); console.log("SSecond  =  ", s_second);
+                    console.log("Les concatenations   =>  Avec SPrimeP  :   ",s_prime_p.concat(s_second), "     Avec SPrimeNonP   :  ",s_prime_non_p.concat(s_second));
+                    return satisfiable(s_prime_p.concat(s_second)) || satisfiable(s_prime_non_p.concat(s_second));
+                }        
+            }
+
+            function testSatisfiabilite()
+            {
+                input1 = document.getElementById("formule").value;
+                ens_clauses = construire_clauses(input1);
+                var reponse = satisfiable(ens_clauses) ? "Satisfiable" : "Insatisfiable";
+                alert(reponse);
+            }
+
+    </script>
+</body>
+</html>
